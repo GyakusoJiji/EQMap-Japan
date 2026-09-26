@@ -1,200 +1,202 @@
 # EQMap
 
-気象庁の震源データを日本地図上に時系列アニメーションで表示する。
+Animated, time-lapse display of Japan Meteorological Agency (JMA) epicenter data on a map of Japan.
 
-正となる DB は Linux サーバー上の SQLite にあり、**毎日1回 自動で気象庁から取り込んで蓄積する**。
-ブラウザアプリはそのサーバーを見に行く。サーバーが無くても単体で動く。
+The authoritative database is SQLite on a Linux server, which **automatically ingests and accumulates JMA data once a day**.
+The browser app reads from that server. It also works on its own without a server.
 
 ```
-  気象庁 list.json ──毎日1回(systemd timer)──▶ Linux サーバー
-                                                 SQLite + HTTP API + 画面配信
+  JMA list.json ──once a day (systemd timer)──▶ Linux server
+                                                 SQLite + HTTP API + app hosting
                                                         │
-                                       ブラウザ ◀────────┘  http://<サーバー>:8787/
-                                       （localStorage はオフライン用キャッシュ）
+                                       Browser ◀────────┘  http://<server>:8787/
+                                       (localStorage is an offline cache)
 ```
 
-## 構成は2通り
+## Two ways to run it
 
-### A. サーバーモード（推奨）
+### A. Server mode (recommended)
 
-ブラウザで `http://<サーバー>:8787/` を開くだけ。アプリ本体も API も同じサーバーが配るので
-CORS の設定はいらない。蓄積はサーバー側に貯まるので、**PC を開いていなくてもデータは増え続ける**。
+Just open `http://<server>:8787/` in a browser. The same server delivers both the app and the API,
+so no CORS setup is needed. Data accumulates on the server, so **it keeps growing even when your PC is off**.
 
-設置は [server/README を兼ねた下記の手順](#linux-サーバーへの設置) を参照。
+For setup, see [the steps below](#installing-on-a-linux-server) (they also serve as the server README).
 
-### B. 単体モード
+### B. Standalone mode
 
-`index.html` をダブルクリックして開く。サーバーが無い場合はアプリが気象庁を直接読み、
-ブラウザの localStorage に貯める。ビルドもサーバも不要。
+Double-click `index.html` to open it. Without a server, the app reads JMA directly
+and stores data in the browser's localStorage. No build or server required.
 
-`file://` で開いたまま既存のサーバーを見たい場合は、URL に `?api=http://<サーバー>:8787` を付ける
-（一度付ければ記憶される。サーバー側を `--cors` 付きで起動しておくこと）。
+To view an existing server while opening the page via `file://`, add `?api=http://<server>:8787` to the URL
+(it is remembered after the first time; start the server with `--cors`).
 
-## 操作
+## Controls
 
-| 操作 | 内容 |
+| Control | Action |
 |---|---|
-| ▶ / ⏸（Space キー） | 再生 / 一時停止 |
-| シークバー | 任意の時刻へ移動 |
-| 速度 | 実時間1秒あたり何時間ぶん進むか |
-| 期間 | 再生範囲を開始・終了日（YYMMDD）で指定。既定は蓄積データの最新日から3か月 |
-| 規模 | マグニチュード下限で絞り込み |
-| マウスホイール | ズーム（カーソル位置を中心に） |
-| ドラッグ | 地図を移動 |
-| 震源にホバー | 震源地名・発生時刻・M・深さ・最大震度 |
-| 全体表示 | 地図の表示範囲をリセット |
-| 更新 | 気象庁から手動で再取得 |
-| 書き出し / 読み込み | 蓄積データを JSON で保存・復元 |
+| ▶ / ⏸ (Space key) | Play / Pause |
+| Seek bar | Jump to any time |
+| Speed | How many hours advance per real-time second |
+| Range | Playback range as start/end dates (YYMMDD). Defaults to 3 months back from the latest stored date |
+| Magnitude | Filter by minimum magnitude |
+| Mouse wheel | Zoom (centered on the cursor) |
+| Drag | Pan the map |
+| Hover an epicenter | Location name, time, M, depth, max intensity |
+| Fit all | Reset the map view |
+| Refresh | Manually re-fetch from JMA |
+| Export / Import | Save / restore stored data as JSON |
 
-## 動作
+## Behavior
 
-### 起動時
+### On startup
 
-1. localStorage のキャッシュから即座に地図を描く（サーバーやネットワークを待たない）
-2. 裏でデータ源に問い合わせる
-   - サーバーモード: `POST /api/refresh` でサーバーに最新確認をさせ、`GET /api/events` で読み直す
-   - 単体モード: 気象庁を直接読んで localStorage へマージ
-3. 再生は自動では始まらない。▶ を押して開始する
+1. Draws the map immediately from the localStorage cache (without waiting for the server or network)
+2. Queries the data source in the background
+   - Server mode: asks the server to check for updates with `POST /api/refresh`, then reloads with `GET /api/events`
+   - Standalone mode: reads JMA directly and merges into localStorage
+3. Playback does not start automatically. Press ▶ to start
 
-左上の「データ源」に、いま **サーバー / キャッシュ / 気象庁 直接** のどれを見ているかが常に出る。
-接続できないときはキャッシュで表示を続ける。
+The "Source" field in the top-left always shows whether you are looking at **Server / Cache / JMA direct**.
+If the source can't be reached, the app keeps displaying the cached data.
 
-### データの蓄積
+### Data accumulation
 
-気象庁が公開している一覧は **直近およそ 30 日分しかない**。取り込んでマージし続けることで、
-それより古い期間もたどれるようになる。
+JMA's public list only covers **roughly the last 30 days**. By continuously ingesting and merging it,
+older periods remain available.
 
-- **サーバーモード** — サーバーの SQLite が正。systemd timer が毎日1回更新する。
-  容量上限は実質なく、何年分でも貯まる。`Persistent=true` なのでサーバーが止まっていた分は
-  起動後に取り返す（一覧に30日の窓があるので数日止まっても取りこぼさない）
-- **単体モード** — localStorage に貯める。上限 30,000 件、超えたら古い順に削除
+- **Server mode** — the server's SQLite is authoritative. A systemd timer updates it once a day.
+  There is effectively no size limit; years of data can accumulate. With `Persistent=true`, any runs missed
+  while the server was down are caught up after boot (the list's 30-day window means a few days of downtime loses nothing)
+- **Standalone mode** — stored in localStorage. Limited to 30,000 events; the oldest are removed beyond that
 
-> **バックアップ**
-> サーバーモードなら `/var/lib/eqmap/eqmap.db` をコピーするだけ。
-> 単体モードは localStorage がブラウザの「閲覧データの削除」で消えるので、
-> ときどき「書き出し」で JSON を保存しておくこと。
+> **Backup**
+> In server mode, just copy `/var/lib/eqmap/eqmap.db`.
+> In standalone mode, localStorage is wiped by the browser's "Clear browsing data",
+> so occasionally save a JSON file with "Export".
 
-> **`file://` で開いた場合の注意**
-> localStorage は Chrome / Edge / Firefox いずれでも動くが、**すべての `file://` ページで共有される**。
+> **Note on opening via `file://`**
+> localStorage works in Chrome / Edge / Firefox, but it is **shared by all `file://` pages**.
 
-## データ出典
+## Data source
 
-[気象庁 地震情報（多言語）](https://www.data.jma.go.jp/multi/quake/index.html?lang=jp)
+[JMA Earthquake Information (multilingual)](https://www.data.jma.go.jp/multi/quake/index.html?lang=jp)
 
-同ページが内部で参照している以下の JSON を直接取得している。
-`Access-Control-Allow-Origin: *` が付与されているため、ブラウザから直接読める。
+The app fetches the following JSON, which that page uses internally, directly.
+It is served with `Access-Control-Allow-Origin: *`, so browsers can read it directly.
 
 ```
 https://www.jma.go.jp/bosai/quake/data/list.json
 ```
 
-### 取り込み時の処理
+### Ingestion processing
 
-- **重複排除** — 同じ地震（`eid`）に複数の報が来る。震源座標を持つ報のうち `ctt`（作成時刻）が
-  最大のものを採用する
-- **震度速報の除外** — `cod`（震源座標）が空なので地図に打てない。自動的に落ちる
-- **座標の2形式に対応** — 通常は十進度 `+32.5+130.5-10000/`。ごく稀に度分形式
-  `+3237.5+13040.7-16000/`（= 32°37.5′N / 130°40.7′E）が混ざるため、値域を超えた値は
-  度分として換算する
-- **深さの欠落** — 第3成分が無いレコードがある。`null`（不明）として扱う
-- **遠地地震の除外** — インドネシアや南米の地震も一覧に含まれる。経度 120–156° /
-  緯度 20–50° の範囲外は表示しない
+- **Deduplication** — the same earthquake (`eid`) receives multiple reports. Among reports with epicenter
+  coordinates, the one with the latest `ctt` (creation time) is used
+- **Seismic intensity bulletins excluded** — their `cod` (epicenter coordinates) is empty, so they can't be plotted
+  and are dropped automatically
+- **Two coordinate formats supported** — normally decimal degrees `+32.5+130.5-10000/`. Very rarely, degree-minute
+  format `+3237.5+13040.7-16000/` (= 32°37.5′N / 130°40.7′E) appears, so out-of-range values are
+  converted as degree-minutes
+- **Missing depth** — some records lack the third component. Treated as `null` (unknown)
+- **Distant earthquakes excluded** — the list also includes earthquakes in Indonesia, South America, etc.
+  Anything outside longitude 120–156° / latitude 20–50° is not shown
 
-## 表示
+## Display
 
-- **円の大きさ = マグニチュード**（`1.6 × 1.45^(M-2)` px）
-- **発生時に点滅し、余韻を残す** — 波紋が広がったあとコアが減衰し、以降は薄い残像になる
-- **残像は表示時刻から3か月ぶんだけ** — それより古い震源は消える（`TRAIL_DAYS = 90`）。
-  全期間を残し続けると画面が埋まって直近の動きが読めなくなるため。ツールチップの
-  当たり判定も同じ範囲に揃えてある
-- 演出の長さは実時間基準（波紋 0.9 秒、余韻 5 秒）で定義してあるため、**再生速度を変えても
-  見え方が変わらない**
+- **Circle size = magnitude** (`1.6 × 1.45^(M-2)` px)
+- **Flashes on occurrence and leaves an afterglow** — a ripple expands, the core fades, and a faint trail remains
+- **Trails cover only 3 months back from the displayed time** — older epicenters disappear (`TRAIL_DAYS = 90`).
+  Keeping the entire period fills the screen and makes recent activity unreadable. Tooltip
+  hit-testing uses the same range
+- Effect durations are defined in real time (ripple 0.9 s, afterglow 5 s), so **changing playback speed
+  doesn't change how they look**
 
-## ファイル構成
+## Files
 
 ```
-index.html                     アプリ本体（正）。HTML / CSS / JS / 地図データを内包した1ファイル
+index.html                     The app (authoritative). Single file containing HTML / CSS / JS / map data
 server/
-  eqmap.py                     サーバー。取得 + SQLite + HTTP API + 画面配信を1ファイルに
-  install.sh                   Linux への設置スクリプト（冪等）
-  web/index.html               配信用にコピーした index.html
-  systemd/eqmap.service         HTTP サーバー常駐ユニット
-  systemd/eqmap-update.service  取得を1回だけ走らせる oneshot ユニット
-  systemd/eqmap-update.timer    毎日1回 上記を叩くタイマー
-tools/make_map_data.py         同梱地図データの生成スクリプト
-tools/japan.geo.js             生成された地図データ（index.html へインライン済み）
+  eqmap.py                     Server. Fetching + SQLite + HTTP API + app hosting in one file
+  install.sh                   Linux install script (idempotent)
+  web/index.html               Copy of index.html for serving
+  systemd/eqmap.service         Resident HTTP server unit
+  systemd/eqmap-update.service  Oneshot unit that runs a single fetch
+  systemd/eqmap-update.timer    Timer that triggers the above once a day
+tools/make_map_data.py         Script that generates the bundled map data
+tools/japan.geo.js             Generated map data (inlined into index.html)
 ```
 
-`index.html` を直したら `server/web/index.html` にコピーし直してから設置すること。
+After editing `index.html`, copy it to `server/web/index.html` before deploying.
 
-## Linux サーバーへの設置
+## Installing on a Linux server
 
-Python 3.8 以上があれば動く。pip インストールは不要。
+Requires Python 3.8 or later. No pip installs needed.
 
 ```sh
-scp -r server/ ユーザー@サーバー:/tmp/eqmap-server
-ssh ユーザー@サーバー 'sudo sh /tmp/eqmap-server/install.sh'
+scp -r server/ user@server:/tmp/eqmap-server
+ssh user@server 'sudo sh /tmp/eqmap-server/install.sh'
 ```
 
-`install.sh` がやること:
+What `install.sh` does:
 
-1. システムユーザー `eqmap` を作る
-2. `/opt/eqmap` にコード、`/var/lib/eqmap` に DB を置く
-3. 気象庁から初回取得して DB を作る
-4. systemd ユニットを入れて `eqmap.service`（HTTP）と `eqmap-update.timer`（毎日1回）を有効化する
-   （systemd が無ければ `/etc/cron.d/eqmap` を代わりに置く）
+1. Creates the system user `eqmap`
+2. Puts the code in `/opt/eqmap` and the DB in `/var/lib/eqmap`
+3. Performs the initial fetch from JMA to create the DB
+4. Installs the systemd units and enables `eqmap.service` (HTTP) and `eqmap-update.timer` (once a day)
+   (without systemd, it installs `/etc/cron.d/eqmap` instead)
 
-冪等なので何度実行してもよい。DB は消えない。
+It is idempotent and can be run any number of times. The DB is preserved.
 
-### 運用コマンド
+### Operations
 
 ```sh
-sudo systemctl status eqmap                     # サーバーの状態
-sudo systemctl list-timers eqmap-update.timer   # 次回の自動更新はいつか
-sudo journalctl -u eqmap-update -n 50           # 更新の履歴
-sudo systemctl start eqmap-update               # 今すぐ1回更新する
+sudo systemctl status eqmap                     # server status
+sudo systemctl list-timers eqmap-update.timer   # when the next automatic update runs
+sudo journalctl -u eqmap-update -n 50           # update history
+sudo systemctl start eqmap-update               # run one update now
 
 sudo -u eqmap python3 /opt/eqmap/eqmap.py --db /var/lib/eqmap/eqmap.db stats
-sudo -u eqmap python3 /opt/eqmap/eqmap.py --db /var/lib/eqmap/eqmap.db import 書き出し.json
+sudo -u eqmap python3 /opt/eqmap/eqmap.py --db /var/lib/eqmap/eqmap.db import export.json
 ```
 
-### 更新タイミングを変える
+### Changing the update schedule
 
-`/etc/systemd/system/eqmap-update.timer` の `OnCalendar` を編集して
-`sudo systemctl daemon-reload && sudo systemctl restart eqmap-update.timer`。
-時刻はサーバーのローカルタイムで解釈される（`timedatectl` で確認）。
+Edit `OnCalendar` in `/etc/systemd/system/eqmap-update.timer`, then run
+`sudo systemctl daemon-reload && sudo systemctl restart eqmap-update.timer`.
+Times are interpreted in the server's local time zone (check with `timedatectl`).
 
 ### API
 
-| エンドポイント | 内容 |
+| Endpoint | Description |
 |---|---|
-| `GET /` | アプリ本体 |
-| `GET /api/events` | 全イベント。`from` / `to`（epoch ミリ秒）、`min_mag`、`limit` で絞れる |
-| `GET /api/status` | 件数・期間・最終取得・直近の取得ログ |
-| `POST /api/refresh` | 今すぐ気象庁を見に行かせる。60秒以内の連打は 429 |
+| `GET /` | The app |
+| `GET /api/events` | All events. Filter with `from` / `to` (epoch ms), `min_mag`, `limit` |
+| `GET /api/status` | Count, span, last fetch, recent fetch log |
+| `POST /api/refresh` | Fetch from JMA now. Repeated requests within 60 seconds get 429 |
 
-`/api/events` は `[eid, t, lat, lon, depth, mag, maxi, name]` の配列を返す。gzip 対応で、
-710 件が約 11 KB。
+`/api/events` returns arrays of `[eid, t, lat, lon, depth, mag, maxi, name]`. Supports gzip;
+710 events are about 11 KB.
 
-### 地図データの再生成
+### Regenerating the map data
 
-[Natural Earth](https://www.naturalearthdata.com/)（Public Domain）の 10m admin_0 から日本を抽出し、
-Douglas–Peucker で簡略化している。Python 標準ライブラリのみで動く。
+Japan is extracted from [Natural Earth](https://www.naturalearthdata.com/) (Public Domain) 10m admin_0
+and simplified with Douglas–Peucker. Runs with only the Python standard library.
 
 ```sh
 python tools/make_map_data.py --tol 0.005
 ```
 
-生成された `tools/japan.geo.js` は 1 行の `const JAPAN_GEO=[...];`。
-`index.html` 内の同じ 1 行を、その中身で丸ごと置き換える。
+The generated `tools/japan.geo.js` is a single line: `const JAPAN_GEO=[...];`.
+Replace the same line in `index.html` with its contents.
 
-`--tol` を上げると粗く・小さくなる（既定 0.01、現在の同梱データは 0.005 = 61 KB / 3721 点）。
+Raising `--tol` makes it coarser and smaller (default 0.01; the current bundled data is 0.005 = 61 KB / 3721 points).
 
-元データ（13 MB）は `tools/_ne_10m_admin_0_countries.geojson` にキャッシュされる。
-消しても次回実行時に再取得されるので、リポジトリには含めなくてよい（`.gitignore` 済み）。
+The source data (13 MB) is cached at `tools/_ne_10m_admin_0_countries.geojson`.
+If deleted, it is re-downloaded on the next run, so it doesn't need to be in the repository (already in `.gitignore`).
 
-## 制限事項
+## Limitations
 
-- 気象庁の JSON は公式に仕様公開された API ではないため、形式が変わる可能性がある
-- 震度速報のみが発表された地震は震源が未確定のため表示されない
-- 湖沼は even-odd 塗りで穴として抜いているが、簡略化の都合で小さな島や入り江は省略される
+- JMA's JSON is not an officially documented API, so its format may change
+- Earthquakes for which only a seismic intensity bulletin was issued have no confirmed epicenter and are not shown
+- Lakes are cut out as holes with even-odd filling, but small islands and inlets are omitted due to simplification
+- Epicenter location names are shown in Japanese, as provided by JMA
