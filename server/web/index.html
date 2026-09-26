@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EQMap — 地震震源 時系列アニメーション</title>
+<title>EQMap — Earthquake Epicenter Timeline Animation</title>
 <style>
   :root{
     --ocean:#070b14;
@@ -138,60 +138,60 @@
 </div>
 
 <div id="hud" class="panel">
-  <h1>EQMap<small>気象庁 震源データ 時系列アニメーション</small></h1>
+  <h1>EQMap<small>JMA epicenter data, animated over time</small></h1>
   <dl id="stats">
-    <dt>蓄積</dt><dd id="s-total">—</dd>
-    <dt>期間</dt><dd id="s-span">—</dd>
-    <dt>表示中</dt><dd id="s-shown">—</dd>
-    <dt>データ源</dt><dd id="s-src">—</dd>
-    <dt>最終取得</dt><dd id="s-fetch">—</dd>
+    <dt>Stored</dt><dd id="s-total">—</dd>
+    <dt>Span</dt><dd id="s-span">—</dd>
+    <dt>Shown</dt><dd id="s-shown">—</dd>
+    <dt>Source</dt><dd id="s-src">—</dd>
+    <dt>Last fetch</dt><dd id="s-fetch">—</dd>
   </dl>
 </div>
 
 <div id="banner" class="panel"><i class="mark"></i><div class="txt"></div></div>
 
 <div id="legend" class="panel">
-  <div class="cap">円の大きさ = マグニチュード</div>
+  <div class="cap">Circle size = magnitude</div>
   <div class="row" id="legend-row"></div>
 </div>
 
 <div id="controls" class="panel">
   <div id="timerow">
-    <button id="play" title="再生 / 一時停止">&#9654;</button>
+    <button id="play" title="Play / Pause">&#9654;</button>
     <div id="clock">—<span>JST</span></div>
-    <input id="seek" type="range" min="0" max="2000" value="2000" step="1" title="時刻シーク">
+    <input id="seek" type="range" min="0" max="2000" value="2000" step="1" title="Seek time">
   </div>
   <div id="optrow">
-    <label>速度
+    <label>Speed
       <select id="speed">
-        <option value="3600000">1時間 / 秒</option>
-        <option value="21600000">6時間 / 秒</option>
-        <option value="43200000">12時間 / 秒</option>
-        <option value="86400000" selected>1日 / 秒</option>
-        <option value="259200000">3日 / 秒</option>
+        <option value="3600000">1 hour / sec</option>
+        <option value="21600000">6 hours / sec</option>
+        <option value="43200000">12 hours / sec</option>
+        <option value="86400000" selected>1 day / sec</option>
+        <option value="259200000">3 days / sec</option>
       </select>
     </label>
-    <label>期間
-      <input id="range-from" class="datebox" type="text" inputmode="numeric" maxlength="6" placeholder="YYMMDD" title="再生範囲の開始日 (YYMMDD)">
+    <label>Range
+      <input id="range-from" class="datebox" type="text" inputmode="numeric" maxlength="6" placeholder="YYMMDD" title="Playback start date (YYMMDD)">
       〜
-      <input id="range-to" class="datebox" type="text" inputmode="numeric" maxlength="6" placeholder="YYMMDD" title="再生範囲の終了日 (YYMMDD)">
+      <input id="range-to" class="datebox" type="text" inputmode="numeric" maxlength="6" placeholder="YYMMDD" title="Playback end date (YYMMDD)">
     </label>
-    <label>規模
+    <label>Magnitude
       <select id="minmag">
-        <option value="0" selected>すべて</option>
-        <option value="2">M2.0 以上</option>
-        <option value="3">M3.0 以上</option>
-        <option value="4">M4.0 以上</option>
-        <option value="5">M5.0 以上</option>
-        <option value="6">M6.0 以上</option>
+        <option value="0" selected>All</option>
+        <option value="2">M2.0+</option>
+        <option value="3">M3.0+</option>
+        <option value="4">M4.0+</option>
+        <option value="5">M5.0+</option>
+        <option value="6">M6.0+</option>
       </select>
     </label>
-    <label><input id="loop" type="checkbox" checked> ループ</label>
+    <label><input id="loop" type="checkbox" checked> Loop</label>
     <span class="spacer"></span>
-    <button class="btn" id="btn-home" title="地図の表示範囲をリセット">全体表示</button>
-    <button class="btn" id="btn-refresh" title="気象庁から再取得">更新</button>
-    <button class="btn" id="btn-export" title="蓄積データを JSON で保存">書き出し</button>
-    <button class="btn" id="btn-import" title="書き出した JSON を取り込む">読み込み</button>
+    <button class="btn" id="btn-home" title="Reset the map view">Fit all</button>
+    <button class="btn" id="btn-refresh" title="Fetch again from JMA">Refresh</button>
+    <button class="btn" id="btn-export" title="Save stored data as JSON">Export</button>
+    <button class="btn" id="btn-import" title="Load an exported JSON file">Import</button>
     <input id="file" type="file" accept="application/json,.json" hidden>
   </div>
 </div>
@@ -384,7 +384,7 @@ async function fetchLatest(){
   const res = await fetch(JMA_LIST_URL + '?_=' + Date.now(), { cache:'no-store' });
   if(!res.ok) throw new Error('HTTP ' + res.status);
   const json = await res.json();
-  if(!Array.isArray(json)) throw new Error('予期しない応答形式');
+  if(!Array.isArray(json)) throw new Error('Unexpected response format');
   return json;
 }
 
@@ -397,7 +397,7 @@ async function serverEvents(){
   const res = await fetch(API + '/api/events', { cache:'no-store' });
   if(!res.ok) throw new Error('HTTP ' + res.status);
   const json = await res.json();
-  if(!Array.isArray(json.events)) throw new Error('予期しない応答形式');
+  if(!Array.isArray(json.events)) throw new Error('Unexpected response format');
   return json;
 }
 
@@ -424,7 +424,7 @@ const Store = {
       return a.filter(e => Array.isArray(e) && e.length >= 8 && isFinite(e[E_T]))
               .sort((x,y) => x[E_T] - y[E_T]);
     }catch(err){
-      console.warn('蓄積データの読み込みに失敗:', err);
+      console.warn('Failed to load stored data:', err);
       return [];
     }
   },
@@ -455,7 +455,7 @@ const Store = {
         dropped += cut;
       }
     }
-    throw new Error('localStorage への保存に失敗しました');
+    throw new Error('Failed to save to localStorage');
   },
 
   meta(){
@@ -776,10 +776,10 @@ function resize(){
 }
 
 function updateStats(){
-  $('s-total').textContent = app.all.length.toLocaleString() + ' 件';
-  $('s-shown').textContent = app.visible.length.toLocaleString() + ' 件';
+  $('s-total').textContent = app.all.length.toLocaleString() + ' events';
+  $('s-shown').textContent = app.visible.length.toLocaleString() + ' events';
   if(app.all.length){
-    $('s-span').textContent = fmtJST(app.all[0][E_T]) + ' 〜 ' + fmtJST(app.all[app.all.length-1][E_T]);
+    $('s-span').textContent = fmtJST(app.all[0][E_T]) + ' – ' + fmtJST(app.all[app.all.length-1][E_T]);
   }else{
     $('s-span').textContent = '—';
   }
@@ -846,14 +846,14 @@ function hitTest(mx, my){
 
 function showTip(e, mx, my){
   const tip = $('tip');
-  const depth = e[E_DEP] == null ? '不明'
-              : (e[E_DEP] <= 0 ? 'ごく浅い' : e[E_DEP].toFixed(0) + ' km');
+  const depth = e[E_DEP] == null ? 'unknown'
+              : (e[E_DEP] <= 0 ? 'very shallow' : e[E_DEP].toFixed(0) + ' km');
   tip.innerHTML =
-    '<b>' + escapeHtml(e[E_NAME] || '震源不明') + '</b><br>' +
+    '<b>' + escapeHtml(e[E_NAME] || 'Unknown epicenter') + '</b><br>' +
     '<span class="sub">' + fmtJST(e[E_T], true) + ' JST</span><br>' +
     '<span class="sub">M ' + (e[E_MAG] == null ? '—' : e[E_MAG].toFixed(1)) +
-    ' ／ 深さ ' + depth +
-    ' ／ 最大震度 ' + (e[E_INT] || '—') + '</span>';
+    ' / Depth ' + depth +
+    ' / Max intensity ' + (e[E_INT] || '—') + '</span>';
   tip.classList.add('show');
   const rect = tip.getBoundingClientRect();
   tip.style.left = clamp(mx + 14, 4, W - rect.width - 4) + 'px';
@@ -996,7 +996,7 @@ function exportJson(){
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  setBanner(app.all.length.toLocaleString() + ' 件を書き出しました。', 'info');
+  setBanner(app.all.length.toLocaleString() + ' events exported.', 'info');
 }
 
 function importJson(ev){
@@ -1006,19 +1006,19 @@ function importJson(ev){
   reader.onload = () => {
     try{
       const incoming = JSON.parse(reader.result);
-      if(!Array.isArray(incoming)) throw new Error('配列ではありません');
+      if(!Array.isArray(incoming)) throw new Error('Not an array');
       const clean = incoming.filter(e => Array.isArray(e) && e.length >= 8 && isFinite(e[E_T]));
-      if(!clean.length) throw new Error('有効なレコードがありません');
+      if(!clean.length) throw new Error('No valid records');
       const before = app.all.length;
       commit(Store.merge(app.all, clean));
-      setBanner('読み込み完了: ' + (app.all.length - before).toLocaleString() +
-                ' 件を追加（合計 ' + app.all.length.toLocaleString() + ' 件）' +
+      setBanner('Import complete: added ' + (app.all.length - before).toLocaleString() +
+                ' events (total ' + app.all.length.toLocaleString() + ')' +
                 (SERVER_MODE
-                   ? '。※この取り込みはこのブラウザ内だけです。サーバーの DB に入れるには ' +
-                     '<code>eqmap.py import ファイル.json</code> を実行してください。'
-                   : ''), SERVER_MODE ? 'warn' : 'info');
+                   ? '. Note: this import only affects this browser. To add it to the server DB, run ' +
+                     '<code>eqmap.py import FILE.json</code>.'
+                   : '.'), SERVER_MODE ? 'warn' : 'info');
     }catch(err){
-      setBanner('読み込みに失敗しました: ' + escapeHtml(err.message), 'bad');
+      setBanner('Import failed: ' + escapeHtml(err.message), 'bad');
     }
     ev.target.value = '';
   };
@@ -1037,9 +1037,9 @@ function commit(list){
     app.all = res.list;
     dropped = res.dropped;
   }catch(err){
-    console.warn('保存に失敗:', err);
+    console.warn('Save failed:', err);
     app.all = list;
-    setBanner('データは表示できますが localStorage に保存できませんでした。', 'warn');
+    setBanner('Data is displayed, but could not be saved to localStorage.', 'warn');
   }
   rebuildVisible(true);
   return dropped;
@@ -1051,7 +1051,7 @@ function cacheLocally(list){
   try{
     Store.save(keep);
   }catch(err){
-    console.warn('オフラインキャッシュの保存に失敗:', err);
+    console.warn('Failed to save offline cache:', err);
   }
 }
 
@@ -1073,40 +1073,40 @@ async function refresh(){
 /** サーバーモード。正となる DB はサーバー側にあるので、丸ごと取り直す。 */
 async function refreshFromServer(){
   const label = API || location.origin;
-  setBanner('サーバーに問い合わせています…（' + escapeHtml(label) + '）', 'info');
+  setBanner('Querying server… (' + escapeHtml(label) + ')', 'info');
   let pushed = null;
   try{
     // まずサーバーへ「今すぐ気象庁を見に行け」と頼む。落ちても読み出しは続ける。
     try{ pushed = await serverRefresh(); }
-    catch(err){ console.warn('更新トリガに失敗（読み出しは続行）:', err); }
+    catch(err){ console.warn('Refresh trigger failed (continuing to load):', err); }
 
     const json = await serverEvents();
     app.all = json.events.slice().sort((a, b) => a[E_T] - b[E_T]);
     app.lastFetch = json.lastFetch || 0;
     cacheLocally(app.all);
     rebuildVisible(false);
-    setSource('サーバー', label);
+    setSource('Server', label);
 
     const note = pushed && pushed.status === 'ok' && pushed.added
-      ? '（今回の問い合わせで新着 ' + pushed.added.toLocaleString() + ' 件）'
-      : (pushed && pushed.status === 'throttled' ? '（サーバーは直前に取得済み）' : '');
-    setBanner('サーバーから ' + app.all.length.toLocaleString() + ' 件を読み込みました' + note +
-              (json.truncated ? ' ※上限で打ち切られています' : '') + '。▶ で再生します。', 'info');
+      ? ' (' + pushed.added.toLocaleString() + ' new from this request)'
+      : (pushed && pushed.status === 'throttled' ? ' (server fetched just now)' : '');
+    setBanner('Loaded ' + app.all.length.toLocaleString() + ' events from the server' + note +
+              (json.truncated ? ' (truncated at the limit)' : '') + '. Press ▶ to play.', 'info');
     autoHideBanner();
   }catch(err){
     console.error(err);
-    setSource('キャッシュ', 'サーバーに接続できないため localStorage の内容を表示中');
-    setBanner('サーバー（' + escapeHtml(label) + '）に接続できません（' + escapeHtml(err.message) + '）。' +
+    setSource('Cache', 'Showing localStorage contents because the server is unreachable');
+    setBanner('Cannot connect to the server (' + escapeHtml(label) + '): ' + escapeHtml(err.message) + '. ' +
               (app.all.length
-                 ? 'オフラインキャッシュ ' + app.all.length.toLocaleString() + ' 件で表示しています。'
-                 : '表示できるデータがありません。') +
-              ' サーバー側で <code>systemctl status eqmap</code> を確認してください。', 'bad');
+                 ? 'Showing ' + app.all.length.toLocaleString() + ' events from the offline cache.'
+                 : 'No data to display.') +
+              ' Check <code>systemctl status eqmap</code> on the server.', 'bad');
   }
 }
 
 /** 単体モード（file:// で直接開いた場合）。気象庁を直接読んでブラウザに貯める。 */
 async function refreshFromJma(){
-  setBanner('気象庁から最新データを取得しています…', 'info');
+  setBanner('Fetching latest data from JMA…', 'info');
   try{
     const raw = await fetchLatest();
     const incoming = normalize(raw);
@@ -1114,23 +1114,23 @@ async function refreshFromJma(){
     const dropped = commit(Store.merge(app.all, incoming));
     const added = app.all.length - before + dropped;
     app.lastFetch = Date.now();
-    setSource('気象庁 直接', '単体モード。サーバーを使うには ?api=http://ホスト:8787 を付けて開く');
+    setSource('JMA direct', 'Standalone mode. To use a server, open with ?api=http://HOST:8787');
     updateStats();
     setBanner(
-      '取得完了 — 気象庁の一覧 ' + incoming.length.toLocaleString() + ' 件のうち新着 ' +
-      Math.max(0, added).toLocaleString() + ' 件を追加。蓄積 ' +
-      app.all.length.toLocaleString() + ' 件' +
-      (dropped ? '（上限超過のため古い ' + dropped.toLocaleString() + ' 件を削除）' : '') +
-      '。▶ で再生します。', 'info');
+      'Fetch complete — added ' + Math.max(0, added).toLocaleString() + ' new of ' +
+      incoming.length.toLocaleString() + ' in the JMA list. Stored: ' +
+      app.all.length.toLocaleString() + ' events' +
+      (dropped ? ' (' + dropped.toLocaleString() + ' oldest removed to stay under the limit)' : '') +
+      '. Press ▶ to play.', 'info');
     autoHideBanner();
   }catch(err){
     console.error(err);
-    setSource('キャッシュ', '気象庁に接続できないため localStorage の内容を表示中');
+    setSource('Cache', 'Showing localStorage contents because JMA is unreachable');
     const hint = location.protocol === 'file:'
-      ? ' ブラウザが file:// からの通信を拒否している可能性があります。フォルダで <code>python -m http.server 8000</code> を実行し <code>http://localhost:8000/</code> を開いてください。'
-      : ' ネットワーク接続を確認してください。';
-    setBanner('気象庁からの取得に失敗しました（' + escapeHtml(err.message) + '）。' +
-              (app.all.length ? '蓄積済みデータで表示しています。' : '') + hint, 'bad');
+      ? ' The browser may be blocking requests from file://. Run <code>python -m http.server 8000</code> in the folder and open <code>http://localhost:8000/</code>.'
+      : ' Check your network connection.';
+    setBanner('Failed to fetch from JMA (' + escapeHtml(err.message) + '). ' +
+              (app.all.length ? 'Showing stored data.' : '') + hint, 'bad');
   }
 }
 
@@ -1145,9 +1145,9 @@ function init(){
   app.lastFetch = Store.meta().lastFetch || 0;
   rebuildVisible(false);
   setPlaying(false);
-  setSource(SERVER_MODE ? '接続中…' : '気象庁 直接', SERVER_MODE ? (API || location.origin) : '');
+  setSource(SERVER_MODE ? 'Connecting…' : 'JMA direct', SERVER_MODE ? (API || location.origin) : '');
   if(app.all.length){
-    setBanner('キャッシュから ' + app.all.length.toLocaleString() + ' 件を復元しました。', 'info');
+    setBanner('Restored ' + app.all.length.toLocaleString() + ' events from cache.', 'info');
   }
 
   // 2. 起動時チェック。再生は自動では始めない。
